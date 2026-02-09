@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
+import numpy as np
 
 # Load dataset
 df = pd.read_csv("pop_stats.csv")
@@ -51,38 +52,56 @@ print("\nCorrelation Matrix (Pearson r):\n")
 print(corr)
 
 # =============================
-# 3. VISUAL ANALYSIS (SAVED)
+# 3. REGRESSION PLOT HELPER
 # =============================
 
-# Youth vs Household Size
-plt.figure()
-plt.scatter(df["Age_0_14_pct"], df["Avg_HH_Size_Total"])
-plt.xlabel("Age 0–14 (%)")
-plt.ylabel("Average Household Size")
-plt.title("Youth Population vs Household Size")
-plt.savefig("youth_vs_household_size.png", dpi=300, bbox_inches="tight")
-plt.show()
+def regression_plot(x, y, xlabel, ylabel, title, filename):
+    m, b = np.polyfit(x, y, 1)
+    y_pred = m * x + b
+    r2 = np.corrcoef(x, y)[0, 1] ** 2
 
-# Elderly vs Household Size
-plt.figure()
-plt.scatter(df["Age_65_plus_pct"], df["Avg_HH_Size_Total"])
-plt.xlabel("Age 65+ (%)")
-plt.ylabel("Average Household Size")
-plt.title("Elderly Population vs Household Size")
-plt.savefig("elderly_vs_household_size.png", dpi=300, bbox_inches="tight")
-plt.show()
-
-# Urbanisation vs Household Size
-plt.figure()
-plt.scatter(df["Urbanisation_Rate"], df["Avg_HH_Size_Total"])
-plt.xlabel("Urbanisation Rate (%)")
-plt.ylabel("Average Household Size")
-plt.title("Urbanisation vs Household Size")
-plt.savefig("urbanisation_vs_household_size.png", dpi=300, bbox_inches="tight")
-plt.show()
+    plt.figure()
+    plt.scatter(x, y)
+    plt.plot(x, y_pred)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(f"{title} (R² = {r2:.2f})")
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
+    plt.show()
 
 # =============================
-# 4. CLUSTERING (K-MEANS)
+# 4. REGRESSION ANALYSIS
+# =============================
+
+regression_plot(
+    df["Age_0_14_pct"],
+    df["Avg_HH_Size_Total"],
+    "Age 0–14 (%)",
+    "Average Household Size",
+    "Youth vs Household Size",
+    "youth_vs_household_size_regression.png"
+)
+
+regression_plot(
+    df["Age_65_plus_pct"],
+    df["Avg_HH_Size_Total"],
+    "Age 65+ (%)",
+    "Average Household Size",
+    "Elderly vs Household Size",
+    "elderly_vs_household_size_regression.png"
+)
+
+regression_plot(
+    df["Urbanisation_Rate"],
+    df["Avg_HH_Size_Total"],
+    "Urbanisation Rate (%)",
+    "Average Household Size",
+    "Urbanisation vs Household Size",
+    "urbanisation_vs_household_size_regression.png"
+)
+
+# =============================
+# 5. CLUSTERING (K-MEANS)
 # =============================
 
 features = df[
@@ -99,13 +118,69 @@ print("\nCluster Assignment by State:")
 print(df[["State", "Cluster"]])
 
 # =============================
-# 5. CLUSTER VISUALISATION
+# 6. CLUSTER SUMMARY
+# =============================
+
+print("\nCluster Summary Statistics:")
+print(
+    df.groupby("Cluster")[[
+        "Age_0_14_pct",
+        "Age_65_plus_pct",
+        "Avg_HH_Size_Total",
+        "Urbanisation_Rate"
+    ]].mean()
+)
+
+# =============================
+# 7. CLUSTER VISUALISATION + REGRESSION
 # =============================
 
 plt.figure()
-plt.scatter(df["Age_0_14_pct"], df["Avg_HH_Size_Total"])
+
+colors = ["tab:blue", "tab:orange", "tab:green"]
+
+for cluster in sorted(df["Cluster"].unique()):
+    cluster_df = df[df["Cluster"] == cluster]
+
+    x = cluster_df["Age_0_14_pct"]
+    y = cluster_df["Avg_HH_Size_Total"]
+
+    plt.scatter(x, y, color=colors[cluster], label=f"Cluster {cluster}")
+
+    # Line of best fit PER CLUSTER
+    m, b = np.polyfit(x, y, 1)
+    plt.plot(x, m * x + b, color=colors[cluster])
+
+# Plot centroids
+centroids = scaler.inverse_transform(kmeans.cluster_centers_)
+plt.scatter(
+    centroids[:, 0],
+    centroids[:, 3],
+    marker="X",
+    s=250,
+    color="black",
+    label="Centroids"
+)
+
 plt.xlabel("Age 0–14 (%)")
 plt.ylabel("Average Household Size")
-plt.title("State Clusters: Youth vs Household Size")
-plt.savefig("clusters_youth_vs_household_size.png", dpi=300, bbox_inches="tight")
+plt.title("Clusters with Cluster-wise Regression Lines")
+plt.legend()
+plt.savefig("clusters_with_regression.png", dpi=300, bbox_inches="tight")
 plt.show()
+
+# =============================
+# 8. KEY CORRELATIONS (TEXT OUTPUT)
+# =============================
+
+print("\nKey Pearson Correlations:")
+
+pairs = [
+    ("Age_0_14_pct", "Avg_HH_Size_Total"),
+    ("Age_65_plus_pct", "Avg_HH_Size_Total"),
+    ("Urbanisation_Rate", "Avg_HH_Size_Total")
+]
+
+for x, y in pairs:
+    r = df[x].corr(df[y])
+    print(f"{x} vs {y}: r = {r:.3f}")
