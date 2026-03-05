@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 import numpy as np
+from sklearn.decomposition import PCA
 
 # Load dataset
 df = pd.read_csv("pop_stats.csv")
@@ -184,3 +185,83 @@ pairs = [
 for x, y in pairs:
     r = df[x].corr(df[y])
     print(f"{x} vs {y}: r = {r:.3f}")
+
+# =============================
+# 9. PCA
+# =============================
+
+pca_features = df[[
+    "Age_0_14_pct",
+    "Age_15_64_pct",
+    "Age_65_plus_pct",
+    "Avg_HH_Size_Total",
+    "Urbanisation_Rate"
+]]
+
+# Standardize data
+scaler_pca = StandardScaler()
+scaled_data = scaler_pca.fit_transform(pca_features)
+
+# Apply PCA
+pca = PCA(n_components=2)
+components = pca.fit_transform(scaled_data)
+
+# Explained variance
+explained = pca.explained_variance_ratio_
+
+print("\nPCA Explained Variance:")
+print(explained)
+
+print("\nTotal Variance Explained by 2 Components:")
+print(f"{explained.sum()*100:.2f}%")
+
+# =============================
+# PCA FEATURE LOADINGS
+# =============================
+
+loadings = pd.DataFrame(
+    pca.components_,
+    columns=pca_features.columns,
+    index=["PC1", "PC2"]
+)
+
+print("\nPCA Feature Loadings:")
+print(loadings)
+
+# =============================
+# CREATE PCA DATAFRAME
+# =============================
+
+pca_df = pd.DataFrame(
+    components,
+    columns=["PC1", "PC2"]
+)
+
+pca_df["State"] = df["State"]
+
+# =============================
+# PCA VISUALISATION
+# =============================
+
+plt.figure()
+
+plt.scatter(
+    pca_df["PC1"],
+    pca_df["PC2"]
+)
+
+# Label each state
+for i, state in enumerate(pca_df["State"]):
+    plt.text(
+        pca_df["PC1"][i],
+        pca_df["PC2"][i],
+        state,
+        fontsize=8
+    )
+
+plt.xlabel(f"Principal Component 1 ({explained[0]*100:.1f}% variance)")
+plt.ylabel(f"Principal Component 2 ({explained[1]*100:.1f}% variance)")
+plt.title("PCA of Malaysian State Demographics")
+
+plt.savefig("pca_states.png", dpi=300, bbox_inches="tight")
+plt.show()
